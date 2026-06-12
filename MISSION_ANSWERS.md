@@ -39,6 +39,12 @@
 3. **Tại sao COPY requirements.txt trước?** — Docker build theo từng layer. Nếu chỉ thay đổi code (không thay đổi requirements.txt), Docker dùng lại layer cache của bước `pip install` → build nhanh hơn nhiều.
 4. **CMD vs ENTRYPOINT khác nhau thế nào?** — `CMD` có thể bị override khi `docker run <image> <command>`, còn `ENTRYPOINT` là lệnh cố định, args truyền vào được append thêm vào sau. `CMD` dùng khi muốn default command dễ thay, `ENTRYPOINT` dùng khi container là một executable cụ thể.
 
+### Exercise 2.3: Image size comparison
+
+- Develop (`python:3.11` single-stage): **1.08 GB**
+- Production (`python:3.11-slim` multi-stage): **198 MB**
+- Difference: **~82% nhỏ hơn**
+
 ### Exercise 2.3: Multi-stage build (`02-docker/production/Dockerfile`)
 
 - **Stage 1 (builder)** làm gì? — Cài `gcc`, `libpq-dev` và toàn bộ Python dependencies bằng `pip install --user`. Stage này có đầy đủ build tools.
@@ -76,6 +82,13 @@ Chúng communicate qua Docker internal network tên `app-network`.
 - **Platform:** Self-hosted VPS + Docker Compose + Cloudflare Tunnel
 - **Public URL:** https://tien-lab.khoav4.com
 - **Status:** Live ✅
+
+**Screenshots:**
+- [Docker build](06-lab-complete/screenshots/image1_build.jpg)
+- [Docker ps (containers running)](06-lab-complete/screenshots/image2_docker_ps.jpg)
+- [Cloudflare Tunnel](06-lab-complete/screenshots/image_cloudflare.jpg)
+- [UI running](06-lab-complete/screenshots/image_UI.jpg)
+- [Curl test results](06-lab-complete/screenshots/image_test_curl.jpg)
 
 Health check response:
 ```json

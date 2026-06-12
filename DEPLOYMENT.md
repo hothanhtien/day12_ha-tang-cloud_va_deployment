@@ -98,6 +98,15 @@ done
 
 ---
 
+## Screenshots
+- [Docker build](06-lab-complete/screenshots/image1_build.jpg)
+- [Docker ps (containers running)](06-lab-complete/screenshots/image2_docker_ps.jpg)
+- [Cloudflare Tunnel](06-lab-complete/screenshots/image_cloudflare.jpg)
+- [UI running](06-lab-complete/screenshots/image_UI.jpg)
+- [Curl test results](06-lab-complete/screenshots/image_test_curl.jpg)
+
+---
+
 ## Environment Variables Set on Server
 - `PORT`
 - `ENVIRONMENT`
