@@ -1,6 +1,6 @@
 # Day 12 Lab - Mission Answers
 
-**Student Name:** Ha Tang  
+**Student Name:** Ho Thanh Tien  
 **Date:** 2026-06-12
 
 ---
