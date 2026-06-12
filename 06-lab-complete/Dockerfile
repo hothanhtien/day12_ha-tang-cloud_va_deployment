@@ -1,50 +1,42 @@
 # ============================================================
-# Production Dockerfile — Multi-stage, < 500 MB, non-root
+# Production Dockerfile — Single-stage, non-root
+# (Đơn giản hóa từ multi-stage gốc để tránh bug copy site-packages)
 # ============================================================
 
-# Stage 1: Builder
-FROM python:3.11-slim AS builder
+FROM python:3.11-slim
 
-WORKDIR /build
-
-RUN apt-get update && apt-get install -y gcc libpq-dev \
+# Cài gcc cho một số package cần build (vd psutil)
+RUN apt-get update && apt-get install -y --no-install-recommends gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# requirements.txt nằm trong 06-lab-complete/, build context = thư mục cha
-COPY 06-lab-complete/requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
-
-
-# Stage 2: Runtime
-FROM python:3.11-slim AS runtime
-
-# Non-root user
+# Tạo user non-root
 RUN groupadd -r agent && useradd -r -g agent -d /app agent
 
 WORKDIR /app
 
-# Copy packages từ builder
-COPY --from=builder /root/.local /home/agent/.local
+# Cài dependencies vào /usr/local (site-packages chuẩn của Python)
+COPY 06-lab-complete/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    && apt-get purge -y gcc && apt-get autoremove -y
 
-# Copy application (build context = thư mục cha nên đường dẫn là 06-lab-complete/app)
+# Copy source code
 COPY 06-lab-complete/app/ ./app/
 COPY utils/ ./utils/
 
+# Set quyền cho user agent
 RUN chown -R agent:agent /app
 
 USER agent
 
-ENV PATH=/home/agent/.local/bin:$PATH
-ENV PYTHONPATH=/app
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
 EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD python -c \
-    "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" \
     || exit 1
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
