@@ -1,11 +1,18 @@
 """
-Mock LLM — dùng chung cho tất cả ví dụ.
-Không cần API key thật. Trả lời giả lập để focus vào deployment concept.
+LLM wrapper — Tự gọi OpenAI nếu có API key, fallback về mock nếu không.
+
+- Có OPENAI_API_KEY → gọi OpenAI thật qua openai SDK
+- Không có key hoặc lỗi → trả mock response (giữ nguyên logic cũ để lab offline)
 """
+import os
 import time
 import random
+import logging
+
+logger = logging.getLogger(__name__)
 
 
+# ── Mock responses (fallback khi không có API key) ───────────
 MOCK_RESPONSES = {
     "default": [
         "Đây là câu trả lời từ AI agent (mock). Trong production, đây sẽ là response từ OpenAI/Anthropic.",
@@ -18,11 +25,52 @@ MOCK_RESPONSES = {
 }
 
 
+# ── OpenAI client (lazy init) ───────────────────────────────
+_openai_client = None
+
+
+def _get_openai_client():
+    """Tạo OpenAI client 1 lần, cache lại."""
+    global _openai_client
+    if _openai_client is None:
+        from openai import OpenAI
+        _openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    return _openai_client
+
+
+def _call_openai(question: str) -> str:
+    """Gọi OpenAI Chat Completions API."""
+    client = _get_openai_client()
+    model = os.getenv("LLM_MODEL", "gpt-4o-mini")
+
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": "Bạn là một AI agent hữu ích, trả lời ngắn gọn bằng tiếng Việt."},
+            {"role": "user", "content": question},
+        ],
+        max_tokens=500,
+        temperature=0.7,
+    )
+    return resp.choices[0].message.content.strip()
+
+
+# ── Public API ───────────────────────────────────────────────
 def ask(question: str, delay: float = 0.1) -> str:
     """
-    Mock LLM call với delay giả lập latency thật.
+    Gọi LLM. Ưu tiên:
+      1. OpenAI thật (nếu OPENAI_API_KEY có trong env)
+      2. Mock response (fallback)
     """
-    time.sleep(delay + random.uniform(0, 0.05))  # simulate API latency
+    if os.getenv("OPENAI_API_KEY"):
+        try:
+            return _call_openai(question)
+        except Exception as e:
+            logger.error(f"OpenAI call failed: {e}")
+            return f"⚠️ Lỗi gọi OpenAI: {type(e).__name__}: {e}. (Đang dùng mock fallback.)"
+
+    # ── Mock fallback (giữ nguyên logic cũ) ──
+    time.sleep(delay + random.uniform(0, 0.05))
 
     question_lower = question.lower()
     for keyword, responses in MOCK_RESPONSES.items():
@@ -34,7 +82,8 @@ def ask(question: str, delay: float = 0.1) -> str:
 
 def ask_stream(question: str):
     """
-    Mock streaming response — yield từng token.
+    Mock streaming — yield từng token.
+    (Nếu muốn streaming OpenAI thật, dùng openai client.stream())
     """
     response = ask(question)
     words = response.split()
