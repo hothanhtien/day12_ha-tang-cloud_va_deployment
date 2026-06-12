@@ -1,0 +1,7 @@
+tunnel: c2235da8-6db4-4dda-9952-2cd1d5d1f68b
+credentials-file: /etc/cloudflared/c2235da8-6db4-4dda-9952-2cd1d5d1f68b.json
+
+ingress:
+  - hostname: tien-lab.khoav4.com
+    service: http://nginx:80
+  - service: http_status:404

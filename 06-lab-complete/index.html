@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Agent — tien-lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Fjalla+One&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080c10;
+      --bg2:       #0d1117;
+      --bg3:       #161b22;
+      --border:    #21262d;
+      --amber:     #f0a500;
+      --amber-dim: #7a5200;
+      --green:     #3fb950;
+      --red:       #f85149;
+      --text:      #c9d1d9;
+      --text-dim:  #484f58;
+      --text-mute: #30363d;
+      --mono:      'Courier Prime', monospace;
+      --display:   'Fjalla One', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.6;
+      overflow: hidden;
+    }
+
+    /* ── Layout ─────────────────────────────────────────── */
+    .shell {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100vh;
+      max-width: 900px;
+      margin: 0 auto;
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+      gap: 16px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .logo-title {
+      font-family: var(--display);
+      font-size: 18px;
+      letter-spacing: 2px;
+      color: var(--amber);
+    }
+
+    .logo-tag {
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+    }
+
+    /* API key input */
+    .key-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      max-width: 360px;
+    }
+
+    .key-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+
+    .key-input {
+      flex: 1;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--amber);
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 6px 10px;
+      outline: none;
+      letter-spacing: 1px;
+      transition: border-color .2s;
+    }
+
+    .key-input:focus { border-color: var(--amber-dim); }
+    .key-input::placeholder { color: var(--text-mute); letter-spacing: 0; }
+
+    /* Status dot */
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-mute);
+      transition: background .3s;
+    }
+
+    .dot.online  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .dot.error   { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+    .dot.loading { background: var(--amber); animation: pulse 1s infinite; }
+
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── Chat area ──────────────────────────────────────── */
+    .chat {
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      scroll-behavior: smooth;
+    }
+
+    .chat::-webkit-scrollbar { width: 4px; }
+    .chat::-webkit-scrollbar-track { background: transparent; }
+    .chat::-webkit-scrollbar-thumb { background: var(--border); }
+
+    /* Welcome screen */
+    .welcome {
+      margin: auto;
+      text-align: center;
+      opacity: .5;
+      pointer-events: none;
+    }
+
+    .welcome-ascii {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--amber);
+      line-height: 1.3;
+      margin-bottom: 16px;
+      opacity: .6;
+    }
+
+    .welcome h2 {
+      font-family: var(--display);
+      font-size: 22px;
+      letter-spacing: 3px;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .welcome p { font-size: 12px; color: var(--text-dim); }
+
+    /* Messages */
+    .msg {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 12px;
+      animation: fadeUp .25s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .msg-icon {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .msg.user .msg-icon {
+      background: var(--amber);
+      color: var(--bg);
+      font-family: var(--display);
+      font-size: 11px;
+      letter-spacing: 1px;
+    }
+
+    .msg.agent .msg-icon {
+      border: 1px solid var(--border);
+      color: var(--green);
+      font-size: 16px;
+    }
+
+    .msg-body { min-width: 0; }
+
+    .msg-meta {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      margin-bottom: 4px;
+    }
+
+    .msg-name {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    .msg.user  .msg-name { color: var(--amber); }
+    .msg.agent .msg-name { color: var(--green); }
+
+    .msg-time {
+      font-size: 10px;
+      color: var(--text-mute);
+    }
+
+    .msg-text {
+      color: var(--text);
+      line-height: 1.7;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .msg.user .msg-text {
+      color: #e6edf3;
+    }
+
+    /* Error message */
+    .msg.error .msg-text {
+      color: var(--red);
+    }
+
+    .msg.error .msg-name { color: var(--red); }
+
+    /* Thinking indicator */
+    .thinking {
+      display: flex;
+      gap: 4px;
+      padding: 4px 0;
+    }
+
+    .thinking span {
+      width: 5px;
+      height: 5px;
+      background: var(--amber);
+      border-radius: 50%;
+      animation: blink 1.2s infinite;
+    }
+
+    .thinking span:nth-child(2) { animation-delay: .2s; }
+    .thinking span:nth-child(3) { animation-delay: .4s; }
+
+    @keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+
+    /* ── Input bar ──────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      background: var(--bg2);
+      padding: 16px 24px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .prompt-prefix {
+      color: var(--amber);
+      font-size: 15px;
+      padding-bottom: 10px;
+      flex-shrink: 0;
+    }
+
+    textarea {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+      min-height: 38px;
+      max-height: 120px;
+      padding: 6px 0;
+      transition: border-color .2s;
+    }
+
+    textarea:focus { border-color: var(--amber-dim); }
+    textarea::placeholder { color: var(--text-mute); }
+
+    .send-btn {
+      background: var(--amber);
+      color: var(--bg);
+      border: none;
+      font-family: var(--display);
+      font-size: 12px;
+      letter-spacing: 2px;
+      padding: 8px 18px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: opacity .15s, transform .1s;
+      height: 38px;
+    }
+
+    .send-btn:hover:not(:disabled) { opacity: .85; }
+    .send-btn:active:not(:disabled) { transform: scale(.97); }
+    .send-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+    .hint {
+      margin-top: 8px;
+      font-size: 10px;
+      color: var(--text-mute);
+      letter-spacing: .5px;
+    }
+
+    /* ── Scrollbar for the whole page ───────────────────── */
+    * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <span class="logo-title">AGENT</span>
+      <span class="logo-tag">tien-lab.khoav4.com</span>
+    </div>
+
+    <div class="key-bar">
+      <span class="key-label">X-API-KEY</span>
+      <input
+        class="key-input"
+        id="apiKey"
+        type="password"
+        placeholder="enter your api key"
+        autocomplete="off"
+      />
+    </div>
+
+    <div class="status">
+      <div class="dot" id="dot"></div>
+      <span id="statusText">offline</span>
+    </div>
+  </header>
+
+  <!-- Chat -->
+  <div class="chat" id="chat">
+    <div class="welcome" id="welcome">
+      <pre class="welcome-ascii">
+  ╔═══════════════════╗
+  ║   AI AGENT v1.0   ║
+  ╚═══════════════════╝</pre>
+      <h2>READY TO DEPLOY</h2>
+      <p>Enter your API key above, then ask anything below.</p>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <footer>
+    <div class="input-row">
+      <span class="prompt-prefix">›</span>
+      <textarea
+        id="input"
+        rows="1"
+        placeholder="ask the agent something..."
+        autocomplete="off"
+      ></textarea>
+      <button class="send-btn" id="sendBtn" disabled>SEND</button>
+    </div>
+    <div class="hint">ENTER to send &nbsp;·&nbsp; SHIFT+ENTER for newline &nbsp;·&nbsp; /health to ping</div>
+  </footer>
+
+</div>
+
+<script>
+  const chat    = document.getElementById('chat');
+  const input   = document.getElementById('input');
+  const sendBtn = document.getElementById('sendBtn');
+  const apiKey  = document.getElementById('apiKey');
+  const dot     = document.getElementById('dot');
+  const statusText = document.getElementById('statusText');
+  const welcome = document.getElementById('welcome');
+
+  // ── Auto-resize textarea ──────────────────────────────
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  });
+
+  // ── Enable send when key present ─────────────────────
+  apiKey.addEventListener('input', updateSendBtn);
+  input.addEventListener('input', updateSendBtn);
+
+  function updateSendBtn() {
+    sendBtn.disabled = !apiKey.value.trim() || !input.value.trim();
+  }
+
+  // ── Enter to send ─────────────────────────────────────
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!sendBtn.disabled) send();
+    }
+  });
+
+  sendBtn.addEventListener('click', send);
+
+  // ── Ping /health on load ──────────────────────────────
+  ping();
+
+  async function ping() {
+    setStatus('loading', 'checking...');
+    try {
+      const r = await fetch('/health', { signal: AbortSignal.timeout(4000) });
+      if (r.ok) {
+        const data = await r.json();
+        setStatus('online', `online · v${data.version || '1.0'}`);
+      } else {
+        setStatus('error', `error ${r.status}`);
+      }
+    } catch {
+      setStatus('error', 'unreachable');
+    }
+  }
+
+  function setStatus(state, text) {
+    dot.className = 'dot ' + state;
+    statusText.textContent = text;
+  }
+
+  // ── Send message ──────────────────────────────────────
+  let busy = false;
+
+  async function send() {
+    if (busy) return;
+    const q = input.value.trim();
+    if (!q) return;
+
+    // Special command
+    if (q === '/health') {
+      input.value = '';
+      input.style.height = 'auto';
+      updateSendBtn();
+      await ping();
+      appendMsg('agent', `↑ pinged /health — status updated.`);
+      return;
+    }
+
+    hideWelcome();
+    appendMsg('user', q);
+    input.value = '';
+    input.style.height = 'auto';
+    updateSendBtn();
+
+    busy = true;
+    sendBtn.disabled = true;
+
+    const thinkId = appendThinking();
+    setStatus('loading', 'thinking...');
+
+    try {
+      const res = await fetch('/ask', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey.value.trim(),
+        },
+        body: JSON.stringify({ question: q }),
+        signal: AbortSignal.timeout(120_000),
+      });
+
+      removeThinking(thinkId);
+
+      if (res.status === 401) {
+        appendMsg('error', '401 Unauthorized — check your API key.');
+        setStatus('error', 'auth failed');
+      } else if (res.status === 429) {
+        appendMsg('error', '429 Rate limit exceeded. Wait a minute.');
+        setStatus('online', 'rate limited');
+      } else if (res.status === 402 || res.status === 503) {
+        appendMsg('error', 'Budget exhausted for today. Try tomorrow.');
+        setStatus('online', 'budget hit');
+      } else if (!res.ok) {
+        appendMsg('error', `Error ${res.status}: ${res.statusText}`);
+        setStatus('error', `error ${res.status}`);
+      } else {
+        const data = await res.json();
+        appendMsg('agent', data.answer, data.model);
+        setStatus('online', `online · ${data.model}`);
+      }
+    } catch (err) {
+      removeThinking(thinkId);
+      if (err.name === 'TimeoutError') {
+        appendMsg('error', 'Request timed out after 120s.');
+      } else {
+        appendMsg('error', 'Network error — is the server up?');
+      }
+      setStatus('error', 'error');
+    }
+
+    busy = false;
+    updateSendBtn();
+  }
+
+  // ── DOM helpers ───────────────────────────────────────
+  function hideWelcome() {
+    if (welcome) welcome.style.display = 'none';
+  }
+
+  function appendMsg(role, text, model) {
+    const wrap = document.createElement('div');
+    wrap.className = `msg ${role}`;
+
+    const now = new Date().toLocaleTimeString('en-US', { hour12: false });
+    const name = role === 'user' ? 'YOU' : role === 'error' ? 'ERR' : 'AGENT';
+    const icon = role === 'user' ? 'YOU' : role === 'error' ? '✕' : '⬡';
+    const modelTag = model ? ` · ${model}` : '';
+
+    wrap.innerHTML = `
+      <div class="msg-icon">${icon}</div>
+      <div class="msg-body">
+        <div class="msg-meta">
+          <span class="msg-name">${name}</span>
+          <span class="msg-time">${now}${modelTag}</span>
+        </div>
+        <div class="msg-text">${escHtml(text)}</div>
+      </div>
+    `;
+
+    chat.appendChild(wrap);
+    chat.scrollTop = chat.scrollHeight;
+    return wrap;
+  }
+
+  function appendThinking() {
+    const id = 'think-' + Date.now();
+    const wrap = document.createElement('div');
+    wrap.className = 'msg agent';
+    wrap.id = id;
+    wrap.innerHTML = `
+      <div class="msg-icon">⬡</div>
+      <div class="msg-body">
+        <div class="msg-meta"><span class="msg-name">AGENT</span></div>
+        <div class="thinking"><span></span><span></span><span></span></div>
+      </div>
+    `;
+    chat.appendChild(wrap);
+    chat.scrollTop = chat.scrollHeight;
+    return id;
+  }
+
+  function removeThinking(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  }
+
+  function escHtml(str) {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+</script>
+</body>
+</html>

@@ -34,3 +34,11 @@ Thumbs.db
 # ── Docker volumes (local dev) ─────────────────────��──────
 data/
 volumes/
+
+# ── Cloudflare Tunnel credentials ─────────────────────────
+# File JSON chứa tunnel secret — KHÔNG BAO GIỜ commit lên git
+# Nếu đã lỡ commit, chạy:
+#   git rm --cached cloudflared/*.json
+#   echo "cloudflared/*.json" >> .gitignore
+cloudflared/*.json
+!cloudflared/config.yml

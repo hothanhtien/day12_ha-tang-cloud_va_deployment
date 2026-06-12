@@ -2,20 +2,49 @@
 
 Kết hợp TẤT CẢ những gì đã học trong 1 project hoàn chỉnh.
 
-## Checklist Deliverable
+## Kiến Trúc
 
-- [x] Dockerfile (multi-stage, < 500 MB)
-- [x] docker-compose.yml (agent + redis)
-- [x] .dockerignore
+```
+Internet
+   │
+   ▼
+Cloudflare (tien-lab.khoav4.com)
+   │
+   ▼
+cloudflared  ← tunnel, không cần public IP
+   │
+   ▼
+nginx:80     ← reverse proxy + serve UI
+   │
+   ├── GET  /          → index.html (UI chat)
+   ├── POST /ask       → backend:8000
+   ├── GET  /health    → backend:8000
+   └── GET  /ready     → backend:8000
+          │
+          ▼
+      backend:8000     ← FastAPI agent
+          │
+          ▼
+       redis:6379      ← rate limit, cost guard
+```
+
+---
+
+## Checklist
+
+- [x] Dockerfile (multi-stage, < 500 MB, non-root)
+- [x] docker-compose.yml (backend + redis + nginx + cloudflared)
+- [x] UI chat (`index.html`)
 - [x] Health check endpoint (`GET /health`)
 - [x] Readiness endpoint (`GET /ready`)
 - [x] API Key authentication
-- [x] Rate limiting
-- [x] Cost guard
+- [x] Rate limiting (20 req/min)
+- [x] Cost guard ($5/day)
 - [x] Config từ environment variables
-- [x] Structured logging
+- [x] Structured JSON logging
 - [x] Graceful shutdown
-- [x] Public URL ready (Railway / Render config)
+- [x] Redis volume (data không mất khi restart)
+- [x] Public URL qua Cloudflare Tunnel
 
 ---
 
@@ -24,70 +53,106 @@ Kết hợp TẤT CẢ những gì đã học trong 1 project hoàn chỉnh.
 ```
 06-lab-complete/
 ├── app/
-│   ├── main.py         # Entry point — kết hợp tất cả
-│   ├── config.py       # 12-factor config
-│   ├── auth.py         # API Key + JWT
-│   ├── rate_limiter.py # Rate limiting
-│   └── cost_guard.py   # Budget protection
-├── Dockerfile          # Multi-stage, production-ready
-├── docker-compose.yml  # Full stack
-├── railway.toml        # Deploy Railway
-├── render.yaml         # Deploy Render
-├── .env.example        # Template
+│   ├── main.py         # FastAPI app — auth, rate limit, cost guard
+│   └── config.py       # 12-factor config từ env vars
+├── index.html          # UI chat
+├── Dockerfile          # Multi-stage build
+├── docker-compose.yml  # backend + redis + nginx + cloudflared
+├── .env.example        # Template — copy thành .env.local
 ├── .dockerignore
 └── requirements.txt
+
+../nginx/
+└── nginx.conf          # Reverse proxy config
+
+../cloudflared/
+├── config.yml          # Tunnel config (tien-lab.khoav4.com)
+└── *.json              # Credentials (KHÔNG commit lên git)
 ```
 
 ---
 
-## Chạy Local
+## Deploy Lên Server
+
+### Bước 1 — Clone repo
 
 ```bash
-# 1. Setup
-cp .env.example .env
-
-# 2. Chạy với Docker Compose
-docker compose up
-
-# 3. Test
-curl http://localhost/health
-
-# 4. Lấy API key từ .env, test endpoint
-API_KEY=$(grep AGENT_API_KEY .env | cut -d= -f2)
-curl -H "X-API-Key: $API_KEY" \
-     -X POST http://localhost/ask \
-     -H "Content-Type: application/json" \
-     -d '{"question": "What is deployment?"}'
+git clone <repo-url>
+cd day12_ha-tang-cloud_va_deployment/06-lab-complete
 ```
 
----
-
-## Deploy Railway (< 5 phút)
+### Bước 2 — Tạo file `.env.local`
 
 ```bash
-# Cài Railway CLI
-npm i -g @railway/cli
-
-# Login và deploy
-railway login
-railway init
-railway variables set OPENAI_API_KEY=sk-...
-railway variables set AGENT_API_KEY=your-secret-key
-railway up
-
-# Nhận public URL!
-railway domain
+# Phải đứng trong 06-lab-complete/ thì cp mới tìm thấy .env.example
+cd 06-lab-complete
+cp .env.example .env.local
+nano .env.local
 ```
+
+> File `.env.local` phải nằm **ngay trong `06-lab-complete/`** cùng cấp với `docker-compose.yml`, vì compose đọc `env_file` theo working directory của file compose, không phải build context.
+
+Sửa 3 giá trị bắt buộc:
+
+```env
+OPENAI_API_KEY=sk-...              # lấy từ platform.openai.com
+AGENT_API_KEY=key-ban-tu-dat       # tự đặt, dùng để nhập vào UI
+JWT_SECRET=<openssl rand -hex 32>  # chuỗi random
+```
+
+### Bước 3 — Thêm Cloudflare credentials
+
+```bash
+# Copy file JSON credentials vào thư mục cloudflared/
+# (lấy từ Cloudflare Dashboard khi tạo tunnel)
+cp ~/c2235da8-*.json ../cloudflared/
+```
+
+### Bước 4 — Build và chạy
+
+```bash
+docker compose up -d --build
+```
+
+### Bước 5 — Kiểm tra
+
+```bash
+# Xem logs
+docker compose logs -f
+
+# Ping health
+curl https://tien-lab.khoav4.com/health
+
+# Test API
+curl https://tien-lab.khoav4.com/ask \
+  -X POST \
+  -H "X-API-Key: key-ban-tu-dat" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Hello"}'
+```
+
+### Bước 6 — Mở UI
+
+Truy cập **https://tien-lab.khoav4.com** → nhập `AGENT_API_KEY` → chat.
 
 ---
 
-## Deploy Render
+## Lệnh Hữu Ích
 
-1. Push repo lên GitHub
-2. Render Dashboard → New → Blueprint
-3. Connect repo → Render đọc `render.yaml`
-4. Set secrets: `OPENAI_API_KEY`, `AGENT_API_KEY`
-5. Deploy → Nhận URL!
+```bash
+# Xem logs từng service
+docker compose logs -f backend
+docker compose logs -f cloudflared
+
+# Restart một service
+docker compose restart backend
+
+# Dừng toàn bộ
+docker compose down
+
+# Dừng và xóa data Redis
+docker compose down -v
+```
 
 ---
 
@@ -96,5 +161,3 @@ railway domain
 ```bash
 python check_production_ready.py
 ```
-
-Script này kiểm tra tất cả items trong checklist và báo cáo những gì còn thiếu.

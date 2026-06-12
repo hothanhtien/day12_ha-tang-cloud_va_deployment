@@ -10,7 +10,8 @@ WORKDIR /build
 RUN apt-get update && apt-get install -y gcc libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+# requirements.txt nằm trong 06-lab-complete/, build context = thư mục cha
+COPY 06-lab-complete/requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 
@@ -25,8 +26,8 @@ WORKDIR /app
 # Copy packages từ builder
 COPY --from=builder /root/.local /home/agent/.local
 
-# Copy application
-COPY app/ ./app/
+# Copy application (build context = thư mục cha nên đường dẫn là 06-lab-complete/app)
+COPY 06-lab-complete/app/ ./app/
 COPY utils/ ./utils/
 
 RUN chown -R agent:agent /app
