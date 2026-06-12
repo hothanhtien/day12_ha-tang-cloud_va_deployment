@@ -1,8 +1,8 @@
 #  Delivery Checklist — Day 12 Lab Submission
 
-> **Student Name:** _________________________  
+> **Student Name:** Ho Thanh Tien  
 > **Student ID:** _________________________  
-> **Date:** _________________________
+> **Date:** 2026-06-12
 
 ---
 
