@@ -40,5 +40,5 @@ volumes/
 # Nếu đã lỡ commit, chạy:
 #   git rm --cached cloudflared/*.json
 #   echo "cloudflared/*.json" >> .gitignore
-cloudflared/*.json
-!cloudflared/config.yml
+# cloudflared/*.json
+# !cloudflared/config.yml
