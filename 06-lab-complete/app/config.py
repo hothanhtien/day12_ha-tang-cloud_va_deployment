@@ -2,6 +2,11 @@
 import os
 import logging
 from dataclasses import dataclass, field
+from dotenv import load_dotenv
+
+# Load .env.local trước (override), sau đó .env (fallback)
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env.local"), override=True)
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=False)
 
 
 @dataclass
